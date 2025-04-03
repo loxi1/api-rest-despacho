@@ -20,8 +20,7 @@ class DatabaseJsonResponse
     public function __construct()
     {
         $this->envVariables = new EnvironmentVariables();
-        $this->sqlQueries = new Queries();
-        
+        $this->sqlQueries = new Queries();        
 
         try {
             $this->odbc = DatabaseConexion::getInstance('sybase')->getConnection();
@@ -96,33 +95,45 @@ class DatabaseJsonResponse
     // Función para registrar usuario, recibe el modelo user
     public function registerUser($user)
     {
-        $query = $this->odbc ->prepare($this->sqlQueries->queryRegisterUser());
+        $stmt = odbc_prepare($this->odbc, $this->sqlQueries->querySaveUser());
 
-        // Array de respuesta por defecto con estado de error
-        $array = [
-            "error" => "Error el registrar usuario.",
-            "status" => "Error"
-        ];
-
-        $passw_hash = password_hash($user->getPasswUser(), PASSWORD_BCRYPT); // Encripta la contraseña
-
-        $result = $query->execute([
-            ":nomb_user" => $user->getNombUser(), ":apell_user" => $user->getApellUser(),
-            ":nick_user" => $user->getNickUser(), ":email_user" => $user->getEmailUser(),
-            ":passw_user" => $passw_hash
-        ]);
-
-        // Si el resultado es satisfactorio modifica el array de respuesta por mensaje satisfactorio
-        if ($result) {
-
-            $array = [
-                "message" => 'Registro satisfactorio.',
-                "status" => 'OK'
+        if (!$stmt) {
+            return [
+                "error" => "Error al preparar consulta: " . odbc_errormsg($this->odbc),
+                "status" => "error"
             ];
         }
 
-        return $array;
+        // Si estás usando encriptación con openssl y no bcrypt:
+        $crypto = new CryptoHelper();
+        $clave_encriptada = $crypto->encriptar($user->getPasswUser());
+
+        $params = [
+            $user->getCodigo(),
+            $user->getDatos(),
+            $user->getEmpresa(),
+            $user->getEstado(),
+            $user->getArea(),
+            $clave_encriptada,
+            $user->getPrivilegio(),
+            $user->getTurno()
+        ];
+
+        $executed = odbc_execute($stmt, $params);
+
+        if (!$executed) {
+            return [
+                "error" => "Error al ejecutar consulta: " . odbc_errormsg($this->odbc),
+                "status" => "error"
+            ];
+        }
+
+        return [
+            "message" => "Registro satisfactorio.",
+            "status" => "OK"
+        ];
     }
+
 
     public function getUsers($headers)
     {
@@ -157,7 +168,7 @@ class DatabaseJsonResponse
             if (!$row) break;
             $users[] = [
                 "id" => $row['identificador'] ?? null,
-                "datos" => utf8_encode($row['datos']) ?? null,
+                "datos" => mb_convert_encoding($row['datos'], 'UTF-8', 'ISO-8859-1') ?? null,
                 "codigo" => $row['codigo'] ?? null
             ];
         }
@@ -169,16 +180,16 @@ class DatabaseJsonResponse
         ];
     }
 
-    public function vincularRfid($rfid, $op, $hm, $color, $talla, $cantidad, $token)
+    public function vincularRfid($rfid, $op, $hm, $iduser, $color, $talla, $cantidad, $token)
     {
-        $sql = "{CALL USP_SAL_EMB_CON_RFID_DATA(?, ?, ?, ?, ?, ?, ?)}";
+        $sql = "{CALL USP_SAL_EMB_CON_RFID_DATA(?, ?, ?, ?, ?, ?, ?, ?)}";
 
         $stmt = odbc_prepare($this->odbc , $sql);
         if (!$stmt) {
             return ["error" => "Error preparando SP: " . odbc_errormsg($this->odbc )];
         }
 
-        $params = [$rfid, $op, $hm, $color, $talla, $cantidad];
+        $params = [$rfid, $op, $hm, $iduser, $color, $talla, $cantidad, $token];
         $executed = odbc_execute($stmt, $params);
 
         if (!$executed) {
@@ -219,7 +230,7 @@ class DatabaseJsonResponse
         while ($row = odbc_fetch_array($stmt)) {
             if (!$row) break;
             $colores[] = [
-                "codigo" => utf8_encode($row['cclrcl']) ?? null,
+                "codigo" => mb_convert_encoding($row['cclrcl'], 'UTF-8', 'ISO-8859-1') ?? null,
                 "color" => $row['tclrcl'] ?? null
             ];
         }
@@ -262,7 +273,7 @@ class DatabaseJsonResponse
         while ($row = odbc_fetch_array($stmt)) {
             if (!$row) break;
             $tallas[] = [
-                "talla" => utf8_encode($row['tdscr']) ?? null,
+                "talla" => mb_convert_encoding($row['tdscr'], 'UTF-8', 'ISO-8859-1') ?? null,
                 "cod_talla" => $row['cod_talla'] ?? null
             ];
         }
@@ -274,10 +285,87 @@ class DatabaseJsonResponse
         ];
     }
 
+    public function getOP($op) {
+        if (!$this->odbc) {
+            return [
+                "error" => "Conexión Sybase no disponible",
+                "status" => "error"
+            ];
+        }
+
+        $sql = $this->sqlQueries->queryGetOP();
+        $stmt = odbc_prepare($this->odbc , $sql);
+
+        if (!$stmt) {
+            return [
+                "error" => "Error al preparar consulta: " . odbc_errormsg($this->odbc ),
+                "status" => "error"
+            ];
+        }
+
+        $executed = odbc_execute($stmt, [':op' => '%' . $op . '%']);
+        if (!$executed) {
+            return [
+                "error" => "Error al ejecutar consulta: " . odbc_errormsg($this->odbc ),
+                "status" => "error"
+            ];
+        }
+
+        $op = "";
+        while ($row = odbc_fetch_array($stmt)) {
+            if (!$row) break;
+            $op = $row["norpd"] ?? null;
+        }
+        
+        return [
+            "op" => $op,
+            "status" => "OK"
+        ];
+    }   
+
+    public function getHM($op, $hm) {
+        if (!$this->odbc) {
+            return [
+                "error" => "Conexión Sybase no disponible",
+                "status" => "error"
+            ];
+        }
+
+        $sql = $this->sqlQueries->queryGetHM();
+        $stmt = odbc_prepare($this->odbc , $sql);
+
+        if (!$stmt) {
+            return [
+                "error" => "Error al preparar consulta: " . odbc_errormsg($this->odbc ),
+                "status" => "error"
+            ];
+        }
+
+        $executed = odbc_execute($stmt, [$op, $hm]);
+        if (!$executed) {
+            return [
+                "error" => "Error al ejecutar consulta: " . odbc_errormsg($this->odbc ),
+                "status" => "error"
+            ];
+        }
+
+        $hojamarca = "";
+
+        while ($row = odbc_fetch_array($stmt)) {
+            if (!$row) break;
+            $hojamarca = $row["nhjmr"] ?? null;
+        }
+        
+        return [
+            "total_hm" => count($hojamarca),
+            "hm" => $hojamarca,
+            "status" => "OK"
+        ];
+    }
+
     // Construye y retorna el token con la información y el usuario($data) requeridos
     private function buildToken($dataUser)
     {
-
         return array(
             "iss" => ISS,
             "aud" => AUD,
@@ -332,15 +420,31 @@ class DatabaseJsonResponse
     private function validateToken($headers)
     {
         $token = $this->getToken($headers);
-        if ($token["status"] == 'OK') {
-            $query = $this->odbc ->prepare($this->sqlQueries->queryGetUserById());
-            $data = $token["data"];
-            $query->execute([":id" => $data->user->id]);
-            if (!$query->fetchColumn()) {
-                return array("status" => 'OK');
-            }
-        }
-        return $token; // en caso de no ser valido retorna el array de error
 
+        if ($token["status"] !== 'OK') {
+            return $token; // Error en el token
+        }
+
+        $data = $token["data"];
+        $sql = $this->sqlQueries->queryGetUserById(); // Consulta con :id
+        $sql = str_replace(":id", "'" . $data->user->id . "'", $sql); // Reemplazo manual del parámetro
+
+        $stmt = odbc_exec($this->odbc, $sql);
+
+        if (!$stmt) {
+            return [
+                "error" => "Error al ejecutar la consulta: " . odbc_errormsg($this->odbc),
+                "status" => "error"
+            ];
+        }
+
+        if (odbc_fetch_row($stmt)) {
+            return ["status" => "OK"];
+        } else {
+            return [
+                "error" => "Token válido, pero el usuario no existe.",
+                "status" => "error"
+            ];
+        }
     }
 }

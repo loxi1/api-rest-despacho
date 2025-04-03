@@ -1,5 +1,4 @@
 <?php
-
 require_once '../api-rest/src/data/DatabaseJsonResponse.php';
 
 class UserController {
@@ -27,5 +26,3 @@ class UserController {
     }
 
 }
-
-?>

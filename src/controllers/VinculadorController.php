@@ -10,9 +10,9 @@ class VinculadorController {
             $this->dbJsonResponse = new DatabaseJsonResponse();
         }
     
-        public function vincular($rfid, $op, $hm, $color, $talla, $cantidad) {
+        public function vincular($rfid, $op, $hm, $iduser, $color, $talla, $cantidad, $token) {
     
-            return $this->dbJsonResponse->vincularRfid($rfid, $op, $hm, $color, $talla, $cantidad);
+            return $this->dbJsonResponse->vincularRfid($rfid, $op, $hm, $iduser, $color, $talla, $cantidad, $token);
         }
     
     }

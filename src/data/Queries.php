@@ -47,6 +47,19 @@ class Queries {
         
         return $query;
     }
+
+    public function querySaveUser() {
+        return "INSERT INTO usuario_timbrado (codigo, datos, empresa, estado, area, clave) 
+            VALUES (?, ?, ?, ?, ?, ?)";
+    }
+
+    public function queryGetOP() {
+        return "select norpd from althmc WHERE norpd like :op group by norpd";
+    }
+
+    public function queryGetHM() {
+        return "select nhjmr from althmc WHERE norpd=:op AND nhjmr=:hm";
+    }
 }
 
 ?>

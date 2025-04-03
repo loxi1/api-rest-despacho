@@ -1,29 +1,67 @@
 <?php
-namespace Src\models;
 
-use Src\data\DB;
 
-class Usuario
-{
-    public function login($codigo, $clave)
-    {
-        $conexion = new DatabaseConexion();
-        $conn = $conexion->conectar();
+// Modelo de usuario
+class Usuario {
+    
+    private $identificador;
+    private $datos;
+    private $empresa;
+    private $estado;
+    private $area;
+    private $codigo;
+    private $clave;
+    private $privilegios;
+    private $turno;
 
-        $sql = "SELECT identificador, codigo, datos, empresa, estado 
-                FROM usuario_timbrado 
-                WHERE estado = 'ACTIVO' AND codigo = ? AND clave = ?";
+    public function __construct($identificador, $datos, $empresa, $estado, $area, $privilegios, $turno, $codigo, $clave) {        
+        $this->identificador = $identificador;
+        $this->datos = $datos;
+        $this->empresa = $empresa;
+        $this->estado = $estado;
+        $this->area = $area;
+        $this->privilegios = $privilegios;
+        $this->turno = $turno;
+        $this->codigo = $codigo;
+        $this->clave = $clave;
+    }
 
-        $stmt = odbc_prepare($conn, $sql);
-        $result = odbc_execute($stmt, [$codigo, $clave]);
+    public function getId() {
+        return $this->identificador;
+    }
 
-        if ($result) {
-            $row = odbc_fetch_array($stmt);
-            $conexion->cerrar();
-            return $row ?: null;
-        }
+    public function getDatos() {
+        return $this->datos;
+    }
 
-        $conexion->cerrar();
-        return null;
+    public function getEmpresa() {
+        return $this->empresa;
+    }
+
+    public function getEstado() {
+        return $this->estado;
+    }
+
+    public function getArea() {
+        return $this->area;
+    }
+
+    public function getCodigo() {
+        return $this->codigo;
+    }
+
+    public function getClave() {
+        return $this->clave;
+    }
+    
+    public function getPrivilegios() {
+        return $this->privilegios;
+    }
+
+    public function getTurno() {
+        return $this->turno;
     }
 }
+
+
+?>
